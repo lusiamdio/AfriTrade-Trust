@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="AfriTrade" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <title>AfriTrade Trust - Pan-African Business Discovery & B2B Marketplace</title>
+    <meta name="description" content="Trusted mobile-first African business discovery platform with verified company registrations, WhatsApp-first commercial enquiries, pan-African B2B trade readiness, and multilingual AI search." />
+    <meta property="og:title" content="AfriTrade Trust - Pan-African Business Discovery & B2B Marketplace" />
+    <meta property="og:description" content="Trusted mobile-first African business discovery platform with verified company registrations, WhatsApp-first commercial enquiries, pan-African B2B trade readiness, and multilingual AI search." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+      // Suppress dev WebSocket disconnect noise in cloud iframe/proxy environments
+      (function() {
+        const _origError = console.error;
+        console.error = function(...args) {
+          const str = args.map(a => (a && (a.message || a.stack)) || String(a)).join(' ');
+          if (str.includes('WebSocket') || str.includes('vite-hmr') || str.includes('closed without opened')) {
+            return;
+          }
+          _origError.apply(console, args);
+        };
+        const _origWarn = console.warn;
+        console.warn = function(...args) {
+          const str = args.map(a => (a && (a.message || a.stack)) || String(a)).join(' ');
+          if (str.includes('WebSocket') || str.includes('vite-hmr') || str.includes('closed without opened')) {
+            return;
+          }
+          _origWarn.apply(console, args);
+        };
+      })();
+      window.addEventListener('error', function(e) {
+        if (e.message && (e.message.includes('WebSocket') || e.message.includes('ws://') || e.message.includes('wss://') || e.message.includes('closed without opened'))) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          return true;
+        }
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        const reasonStr = String((e && (e.reason && (e.reason.message || e.reason))) || '');
+        if (reasonStr.includes('WebSocket') || reasonStr.includes('closed without opened')) {
+          e.stopImmediatePropagation();
+          e.preventDefault();
+          return true;
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

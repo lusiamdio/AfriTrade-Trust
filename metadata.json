@@ -1,0 +1,6 @@
+{
+  "name": "AfriTrade Trust - Pan-African Business Discovery & B2B Marketplace",
+  "description": "Trusted mobile-first African business discovery platform with verified company registrations, WhatsApp-first commercial enquiries, pan-African B2B trade readiness, and multilingual AI search.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
