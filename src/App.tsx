@@ -27,6 +27,12 @@ import {
   loadSuspiciousReports,
   saveSuspiciousReports,
 } from './utils/superAdminStorage';
+import {
+  initRealtimeBroadcast,
+  broadcastRealtimeUpdate,
+  RealtimeSyncPayload,
+  isSupabaseConfigured,
+} from './utils/supabaseClient';
 
 // Webpages (Transformed from all modals into dedicated full webpages)
 import { EnterDirectoryPage } from './pages/EnterDirectoryPage';
@@ -159,6 +165,60 @@ export default function App() {
   useEffect(() => {
     saveMarketplaceCache(businesses, sourcingRequests, quotations);
   }, [businesses, sourcingRequests, quotations]);
+
+  // Realtime Supabase Broadcast listener & multi-client sync
+  const [supabaseRealtimeConnected, setSupabaseRealtimeConnected] = useState<boolean>(false);
+
+  useEffect(() => {
+    let cleanup: (() => void) | null = null;
+    initRealtimeBroadcast((payload: RealtimeSyncPayload) => {
+      switch (payload.event) {
+        case 'BUSINESS_ADDED':
+          if (payload.data && payload.data.id) {
+            setBusinesses((prev) => {
+              if (prev.some((b) => b.id === payload.data.id)) return prev;
+              return [payload.data, ...prev];
+            });
+          }
+          break;
+        case 'BUSINESS_UPDATED':
+          if (payload.data && payload.data.id) {
+            setBusinesses((prev) =>
+              prev.map((b) => (b.id === payload.data.id ? payload.data : b))
+            );
+          }
+          break;
+        case 'RFQ_POSTED':
+          if (payload.data && payload.data.id) {
+            setSourcingRequests((prev) => {
+              if (prev.some((r) => r.id === payload.data.id)) return prev;
+              return [payload.data, ...prev];
+            });
+          }
+          break;
+        case 'QUOTE_SUBMITTED':
+          if (payload.data && payload.data.id) {
+            setQuotations((prev) => {
+              if (prev.some((q) => q.id === payload.data.id)) return prev;
+              return [payload.data, ...prev];
+            });
+          }
+          break;
+        case 'FORCE_SYNC':
+          if (payload.data?.reason === 'CREDENTIALS_ROTATED') {
+            setCurrentUser(null);
+          }
+          break;
+      }
+    }).then((unsub) => {
+      cleanup = unsub;
+      setSupabaseRealtimeConnected(true);
+    });
+
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, []);
 
 
   // Filters State
@@ -468,6 +528,7 @@ export default function App() {
     };
 
     setSourcingRequests([fullRFQ, ...sourcingRequests]);
+    broadcastRealtimeUpdate('RFQ_POSTED', fullRFQ);
   };
 
   const handleSubmitQuotation = (newQuote: Partial<SupplierQuotation>) => {
@@ -489,6 +550,7 @@ export default function App() {
     };
 
     setQuotations([fullQuote, ...quotations]);
+    broadcastRealtimeUpdate('QUOTE_SUBMITTED', fullQuote);
     setSourcingRequests((prev) =>
       prev.map((r) =>
         r.id === fullQuote.rfqId
@@ -531,6 +593,7 @@ export default function App() {
     if (targetTab) {
       setActiveTab(targetTab);
     }
+    broadcastRealtimeUpdate('BUSINESS_ADDED', newBiz);
   };
 
 
@@ -552,6 +615,7 @@ export default function App() {
         console.warn('Storage sync error:', e);
       }
     }
+    broadcastRealtimeUpdate('BUSINESS_UPDATED', updated);
   };
 
   const handleDirectWhatsAppText = (phone: string, text: string) => {

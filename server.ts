@@ -15,10 +15,15 @@ const httpServer = http.createServer(app);
 app.use(express.json());
 
 
-const apiKey = process.env.GEMINI_API_KEY;
-const ai = apiKey
+const geminiKey = process.env.GEMINI_API_KEY;
+const openrouterKey = process.env.Openrouter_api || process.env.OPENROUTER_API_KEY;
+const openAIKey = process.env.OpenAI_key || process.env.OPENAI_API_KEY;
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.Supabase_project_url || process.env.SUPABASE_URL || '';
+const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.Supabase_anon_key || process.env.Supabase_publishable_key || process.env.SUPABASE_ANON_KEY || '';
+
+const ai = geminiKey
   ? new GoogleGenAI({
-      apiKey,
+      apiKey: geminiKey,
       httpOptions: {
         headers: {
           'User-Agent': 'aistudio-build',
@@ -27,12 +32,26 @@ const ai = apiKey
     })
   : null;
 
-// Health check endpoint
+// Health check endpoint with real-time status of all rotated credentials
 app.get('/api/health', (_req, res) => {
   res.json({
     status: 'ok',
-    hasGeminiKey: Boolean(apiKey),
+    hasGeminiKey: Boolean(geminiKey),
+    hasSupabase: Boolean(supabaseUrl && supabaseAnonKey),
+    hasOpenRouter: Boolean(openrouterKey),
+    hasOpenAI: Boolean(openAIKey),
+    supabaseUrl: supabaseUrl ? supabaseUrl.replace(/https:\/\/(.{4}).*(\..*)/, 'https://$1***$2') : null,
     timestamp: new Date().toISOString(),
+    version: '2.1.0-realtime',
+  });
+});
+
+// Supabase Real-time configuration endpoint for frontend client
+app.get('/api/supabase/config', (_req, res) => {
+  res.json({
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
+    configured: Boolean(supabaseUrl && supabaseAnonKey),
   });
 });
 
@@ -387,6 +406,10 @@ if (process.env.NODE_ENV === 'production') {
       alias: {
         '@': path.resolve(__dirname),
       },
+    },
+    define: {
+      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
+      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
     },
     server: {
       middlewareMode: true,
