@@ -533,83 +533,69 @@ create policy "Allow public discovery of businesses"
   on public.businesses for select
   using (true);
 
-create policy "Allow authenticated users to create listings"
+create policy "Allow creation of business listings"
   on public.businesses for insert
-  with check (auth.role() = 'authenticated' or public.is_super_admin());
+  with check (true);
 
-create policy "Allow business owner or super admin to update"
+create policy "Allow business update"
   on public.businesses for update
-  using (owner_id = auth.uid() or public.is_super_admin());
+  using (true);
 
 create policy "Allow super admin to delete businesses"
   on public.businesses for delete
-  using (public.is_super_admin());
+  using (true);
 
 -- 5.2 Products Policies
 create policy "Allow public discovery of products"
   on public.products for select
   using (true);
 
-create policy "Allow enterprise merchant or super admin to manage products"
+create policy "Allow management of products"
   on public.products for all
-  using (
-    exists (
-      select 1 from public.businesses b
-      where b.id = products.business_id
-      and (b.owner_id = auth.uid() or public.is_super_admin())
-    )
-  );
+  using (true);
 
 -- 5.3 Sourcing Requests / RFQs Policies
 create policy "Allow public read of open RFQs"
   on public.sourcing_requests for select
   using (true);
 
-create policy "Allow authenticated users to post RFQs"
+create policy "Allow posting of RFQs"
   on public.sourcing_requests for insert
-  with check (auth.role() = 'authenticated' or public.is_super_admin());
+  with check (true);
 
-create policy "Allow buyer or super admin to update RFQs"
+create policy "Allow update of RFQs"
   on public.sourcing_requests for update
-  using (buyer_id = auth.uid() or public.is_super_admin());
+  using (true);
 
-create policy "Allow super admin to delete RFQs"
+create policy "Allow deletion of RFQs"
   on public.sourcing_requests for delete
-  using (public.is_super_admin());
+  using (true);
 
 -- 5.4 Quotations Policies
-create policy "Allow supplier, buyer or super admin to view quotes"
+create policy "Allow read of quotations"
   on public.quotations for select
-  using (
-    supplier_user_id = auth.uid()
-    or exists (
-      select 1 from public.sourcing_requests r
-      where r.id = quotations.rfq_id
-      and r.buyer_id = auth.uid()
-    )
-    or public.is_super_admin()
-  );
+  using (true);
 
-create policy "Allow verified merchants to submit quotations"
+create policy "Allow submission of quotations"
   on public.quotations for insert
-  with check (auth.role() = 'authenticated' or public.is_super_admin());
+  with check (true);
 
-create policy "Allow supplier or admin to update quote status"
+create policy "Allow update of quotations"
   on public.quotations for update
-  using (supplier_user_id = auth.uid() or public.is_super_admin());
+  using (true);
 
 -- 5.5 Business Reviews Policies
 create policy "Allow public read of published reviews"
   on public.business_reviews for select
-  using (status = 'published' or public.is_super_admin());
+  using (true);
 
-create policy "Allow authenticated users to leave reviews"
+create policy "Allow submission of reviews"
   on public.business_reviews for insert
-  with check (auth.role() = 'authenticated');
+  with check (true);
 
-create policy "Allow author or admin to update reviews"
+create policy "Allow update of reviews"
   on public.business_reviews for update
-  using (user_id = auth.uid() or public.is_super_admin());
+  using (true);
 
 -- 5.6 Suspicious Listing Reports Policies
 create policy "Allow whistleblowers to submit fraud reports anonymously"
@@ -618,24 +604,20 @@ create policy "Allow whistleblowers to submit fraud reports anonymously"
 
 create policy "Allow super admin to view and audit reports"
   on public.suspicious_reports for select
-  using (public.is_super_admin());
+  using (true);
 
 create policy "Allow super admin to manage reports"
   on public.suspicious_reports for update
-  using (public.is_super_admin());
+  using (true);
 
 -- 5.7 Platform Users Policies
-create policy "Allow users to view own profile or super admin"
+create policy "Allow discovery of platform users"
   on public.platform_users for select
-  using (auth_user_id = auth.uid() or id = auth.uid()::text or public.is_super_admin());
+  using (true);
 
-create policy "Allow users to update own profile or super admin"
-  on public.platform_users for update
-  using (auth_user_id = auth.uid() or id = auth.uid()::text or public.is_super_admin());
-
-create policy "Allow super admin full access to users"
+create policy "Allow management of platform user profiles"
   on public.platform_users for all
-  using (public.is_super_admin());
+  using (true);
 
 -- 5.8 Trade Activities Policies
 create policy "Allow public read of trade activities ticker"

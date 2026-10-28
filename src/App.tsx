@@ -32,6 +32,17 @@ import {
   broadcastRealtimeUpdate,
   RealtimeSyncPayload,
   isSupabaseConfigured,
+  fetchBusinessesFromSupabase,
+  fetchRFQsFromSupabase,
+  fetchQuotationsFromSupabase,
+  fetchPlatformUsersFromSupabase,
+  upsertBusinessToSupabase,
+  upsertRFQToSupabase,
+  upsertQuotationToSupabase,
+  upsertPlatformUserToSupabase,
+  insertReviewToSupabase,
+  insertReportToSupabase,
+  syncBusinessesToSupabase,
 } from './utils/supabaseClient';
 
 // Webpages (Transformed from all modals into dedicated full webpages)
@@ -220,6 +231,66 @@ export default function App() {
     };
   }, []);
 
+  // Hydrate data from Supabase PostgreSQL on startup
+  useEffect(() => {
+    let isMounted = true;
+    async function hydrateFromSupabase() {
+      try {
+        const [remoteBiz, remoteRFQs, remoteQuotes, remoteUsers] = await Promise.all([
+          fetchBusinessesFromSupabase(),
+          fetchRFQsFromSupabase(),
+          fetchQuotationsFromSupabase(),
+          fetchPlatformUsersFromSupabase(),
+        ]);
+
+        if (!isMounted) return;
+
+        if (remoteBiz.length > 0) {
+          setBusinesses((localBiz) => {
+            const map = new Map<string, BusinessListing>();
+            localBiz.forEach((b) => map.set(b.id, b));
+            remoteBiz.forEach((b) => map.set(b.id, b));
+            return Array.from(map.values());
+          });
+        }
+
+        if (remoteRFQs.length > 0) {
+          setSourcingRequests((localRFQs) => {
+            const map = new Map<string, SourcingRequest>();
+            localRFQs.forEach((r) => map.set(r.id, r));
+            remoteRFQs.forEach((r) => map.set(r.id, r));
+            return Array.from(map.values());
+          });
+        }
+
+        if (remoteQuotes.length > 0) {
+          setQuotations((localQuotes) => {
+            const map = new Map<string, SupplierQuotation>();
+            localQuotes.forEach((q) => map.set(q.id, q));
+            remoteQuotes.forEach((q) => map.set(q.id, q));
+            return Array.from(map.values());
+          });
+        }
+
+        if (remoteUsers.length > 0) {
+          setPlatformUsers((localUsers) => {
+            const map = new Map<string, PlatformUserAccount>();
+            localUsers.forEach((u) => map.set(u.id, u));
+            remoteUsers.forEach((u) => map.set(u.id, u));
+            return Array.from(map.values());
+          });
+        }
+      } catch (e) {
+        console.debug('[Supabase Initial Load Error]', e);
+      }
+    }
+
+    hydrateFromSupabase();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
 
   // Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -284,6 +355,7 @@ export default function App() {
 
   // Synchronized Real-Time Reviews Handler
   const handleAddReview = (businessId: string, review: BusinessReview) => {
+    let updatedBusinessTarget: BusinessListing | null = null;
     setBusinesses((prev) => {
       const updated = prev.map((b) => {
         if (b.id === businessId) {
@@ -293,12 +365,14 @@ export default function App() {
           const newReviews = [review, ...existingReviews];
           const sum = newReviews.reduce((acc, r) => acc + r.rating, 0);
           const newRating = Number((sum / newReviews.length).toFixed(1));
-          return {
+          const updatedBiz: BusinessListing = {
             ...b,
             reviews: newReviews,
             rating: newRating,
             reviewCount: newReviews.length,
           };
+          updatedBusinessTarget = updatedBiz;
+          return updatedBiz;
         }
         return b;
       });
@@ -326,6 +400,13 @@ export default function App() {
           reviewCount: newReviews.length,
         };
       });
+    }
+
+    // Persist review and updated business to Supabase
+    insertReviewToSupabase(businessId, review).catch(console.warn);
+    if (updatedBusinessTarget) {
+      upsertBusinessToSupabase(updatedBusinessTarget).catch(console.warn);
+      broadcastRealtimeUpdate('BUSINESS_UPDATED', updatedBusinessTarget);
     }
   };
 
@@ -528,6 +609,7 @@ export default function App() {
     };
 
     setSourcingRequests([fullRFQ, ...sourcingRequests]);
+    upsertRFQToSupabase(fullRFQ).catch(console.warn);
     broadcastRealtimeUpdate('RFQ_POSTED', fullRFQ);
   };
 
@@ -550,6 +632,7 @@ export default function App() {
     };
 
     setQuotations([fullQuote, ...quotations]);
+    upsertQuotationToSupabase(fullQuote).catch(console.warn);
     broadcastRealtimeUpdate('QUOTE_SUBMITTED', fullQuote);
     setSourcingRequests((prev) =>
       prev.map((r) =>
@@ -559,7 +642,6 @@ export default function App() {
       )
     );
   };
-
 
   const handleAddNewBusiness = (newBiz: BusinessListing, targetTab?: string) => {
     setBusinesses((prev) => [newBiz, ...prev]);
@@ -593,9 +675,13 @@ export default function App() {
     if (targetTab) {
       setActiveTab(targetTab);
     }
+
+    // Persist to Supabase in real-time
+    upsertBusinessToSupabase(newBiz).catch(console.warn);
+    upsertPlatformUserToSupabase(newMerchantUser).catch(console.warn);
+
     broadcastRealtimeUpdate('BUSINESS_ADDED', newBiz);
   };
-
 
   const defaultSMEStore = currentUser?.business || businesses[0];
 
@@ -615,6 +701,10 @@ export default function App() {
         console.warn('Storage sync error:', e);
       }
     }
+
+    // Persist to Supabase
+    upsertBusinessToSupabase(updated).catch(console.warn);
+
     broadcastRealtimeUpdate('BUSINESS_UPDATED', updated);
   };
 
@@ -1267,6 +1357,7 @@ export default function App() {
                 status: 'investigating',
               };
               setSuspiciousReports((prev) => [newReport, ...prev]);
+              insertReportToSupabase(newReport).catch(console.warn);
             }}
           />
         )}
@@ -1284,9 +1375,18 @@ export default function App() {
               }
             }}
             onClaimSubmitted={(id) => {
-              setBusinesses((prev) =>
-                prev.map((b) => (b.id === id ? { ...b, claimedByOwner: true } : b))
-              );
+              setBusinesses((prev) => {
+                const updated = prev.map((b) => (b.id === id ? { ...b, claimedByOwner: true } : b));
+                const target = updated.find((b) => b.id === id);
+                if (target) {
+                  upsertBusinessToSupabase(target).catch(console.warn);
+                  broadcastRealtimeUpdate('BUSINESS_UPDATED', target);
+                  if (selectedBusiness?.id === id) {
+                    setSelectedBusiness(target);
+                  }
+                }
+                return updated;
+              });
             }}
           />
         )}
@@ -1299,11 +1399,34 @@ export default function App() {
             quotations={quotations}
             reports={suspiciousReports}
             users={platformUsers}
-            onUpdateBusinesses={setBusinesses}
-            onUpdateSourcingRequests={setSourcingRequests}
-            onUpdateQuotations={setQuotations}
-            onUpdateReports={setSuspiciousReports}
-            onUpdateUsers={setPlatformUsers}
+            onUpdateBusinesses={(list) => {
+              setBusinesses(list);
+              syncBusinessesToSupabase(list).catch(console.warn);
+              broadcastRealtimeUpdate('BUSINESS_UPDATED');
+            }}
+            onUpdateSourcingRequests={(rfqList) => {
+              setSourcingRequests(rfqList);
+              for (const rfq of rfqList) {
+                upsertRFQToSupabase(rfq).catch(console.warn);
+              }
+              broadcastRealtimeUpdate('RFQ_POSTED');
+            }}
+            onUpdateQuotations={(quoteList) => {
+              setQuotations(quoteList);
+              for (const q of quoteList) {
+                upsertQuotationToSupabase(q).catch(console.warn);
+              }
+              broadcastRealtimeUpdate('QUOTE_SUBMITTED');
+            }}
+            onUpdateReports={(repList) => {
+              setSuspiciousReports(repList);
+            }}
+            onUpdateUsers={(userList) => {
+              setPlatformUsers(userList);
+              for (const u of userList) {
+                upsertPlatformUserToSupabase(u).catch(console.warn);
+              }
+            }}
             onBackToDirectory={() => {
               setActiveTab('explore');
               window.scrollTo({ top: 0, behavior: 'smooth' });
